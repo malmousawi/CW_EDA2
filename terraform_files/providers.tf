@@ -1,3 +1,3 @@
 provider "harvester" {
-  kubeconfig = "~/eda2_cw/kube/config"
+  kubeconfig = "~/CW_EDA2/terraform_files/kube/config"
 }
