@@ -13,11 +13,11 @@ def run(command):
 def generate_inventory():
     """Generate Ansible inventory from Terraform outputs."""
     try:
-        # Fetch IPs from Terraform outputs
-        worker_vm_ips = json.loads(run(["terraform", "output", "--json", "worker_vm_ips"]))
+        # Fetch full Terraform output as JSON
+        terraform_output = json.loads(run(["terraform", "output", "--json"]))
 
-        # Extract the "value" key if outputs are not directly lists
-        worker_vm_ips = worker_vm_ips if isinstance(worker_vm_ips, list) else worker_vm_ips.get("value", [])
+        # Extract worker VM IPs from "value" field
+        worker_vm_ips = terraform_output.get("worker_vm_ips", {}).get("value", [])
 
     except Exception as e:
         print(f"Error generating inventory: {e}")
@@ -25,21 +25,23 @@ def generate_inventory():
 
     # Define common SSH variables
     ansible_user = "almalinux"
-    private_key_file = "/home/almalinux/eda2_cw/ssh_key_1.pem"  # Replace with the actual path to your private key
+    private_key_file = "/home/almalinux/CW_EDA2/ssh_key_1.pem"  # Adjust path as needed
 
-    # Build inventory
+    # Use IPs directly as host keys instead of worker1, worker2, etc.
     inventory = {
         "_meta": {
             "hostvars": {
                 ip: {
-                    "ansible_ssh_host": ip,
+                    "ansible_host": ip,
                     "ansible_user": ansible_user,
                     "ansible_ssh_private_key_file": private_key_file,
                 }
                 for ip in worker_vm_ips
             }
         },
-        "worker": {"hosts": worker_vm_ips},
+        "worker": {
+            "hosts": {ip: {} for ip in worker_vm_ips}
+        }
     }
 
     return inventory
@@ -61,7 +63,6 @@ if __name__ == "__main__":
             print(f"Error generating inventory: {e}")
             print("{}")
     elif args.host:
-        # Single host vars can be returned as an empty object (not used in this setup)
         print(json.dumps({}))
     else:
         parser.print_help()
