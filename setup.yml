@@ -1,0 +1,87 @@
+---
+- name: Common setup on all machines
+  hosts: all
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install baseline packages
+      apt:
+        name:
+          - build-essential
+          - python3
+          - python3-venv
+          - python3-pip
+          - git
+          - libffi-dev
+          - libssl-dev
+        state: present
+
+    - name: Create project directory
+      file:
+        path: /opt/celery_project
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Create Python venv
+      command: python3 -m venv /opt/celery_project/venv
+      args:
+        creates: /opt/celery_project/venv/bin/activate
+
+- name: Install Redis on the "host" machine
+  hosts: host
+  become: yes
+  tasks:
+    - name: Install redis-server
+      apt:
+        name: redis-server
+        state: present
+
+    - name: Bind Redis to 0.0.0.0 for demonstration
+      lineinfile:
+        path: /etc/redis/redis.conf
+        regexp: '^bind '
+        line: 'bind 0.0.0.0'
+        backup: yes
+
+    - name: Restart and enable Redis
+      service:
+        name: redis-server
+        state: restarted
+        enabled: yes
+
+- name: Install Celery + dependencies on all machines
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install Celery, Redis client, Flower (optional)
+      pip:
+        virtualenv: /opt/celery_project/venv
+        name:
+          - celery
+          - redis
+          - flower  # optional if you want Celery Flower for monitoring
+        state: present
+
+- name: Install PyTorch + ESM on workers
+  hosts: workers
+  become: yes
+  tasks:
+    - name: Install PyTorch (CPU only)
+      pip:
+        virtualenv: /opt/celery_project/venv
+        name: torch==2.0.0+cpu
+        extra_args: -f https://download.pytorch.org/whl/cpu/torch_stable.html
+        state: present
+
+    - name: Install ESM
+      pip:
+        virtualenv: /opt/celery_project/venv
+        name: fair-esm
+        state: present
+
