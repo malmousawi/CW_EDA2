@@ -11,38 +11,55 @@ def run(command):
     return result.stdout.strip()
 
 def generate_inventory():
-    """Generate Ansible inventory from Terraform outputs."""
+    """Generate Ansible inventory from Terraform outputs using SSH agent forwarding."""
     try:
         # Fetch full Terraform output as JSON
         terraform_output = json.loads(run(["terraform", "output", "--json"]))
-
         # Extract worker VM IPs from "value" field
         worker_vm_ips = terraform_output.get("worker_vm_ips", {}).get("value", [])
-
+        # Extract host VM IP from "host_vm_ip" (if available)
+        host_vm_ip = terraform_output.get("host_vm_ip", {}).get("value", None)
     except Exception as e:
         print(f"Error generating inventory: {e}")
         return {}
 
-    # Define common SSH variables
     ansible_user = "almalinux"
-    private_key_file = "/home/almalinux/CW_EDA2/ssh_key_1.pem"  # Adjust path as needed
+    # Using SSH agent forwarding, so we don't specify a private key file.
+    common_vars = {
+        "ansible_user": ansible_user,
+        "ansible_ssh_common_args": "-o ForwardAgent=yes"
+    }
 
-    # Use IPs directly as host keys instead of worker1, worker2, etc.
+    # Build _meta hostvars for workers
+    worker_hostvars = {
+        ip: {
+            "ansible_host": ip,
+            **common_vars
+        }
+        for ip in worker_vm_ips
+    }
+
+    # Build inventory groups
     inventory = {
         "_meta": {
-            "hostvars": {
-                ip: {
-                    "ansible_host": ip,
-                    "ansible_user": ansible_user,
-                    "ansible_ssh_private_key_file": private_key_file,
-                }
-                for ip in worker_vm_ips
-            }
+            "hostvars": worker_hostvars
         },
         "worker": {
             "hosts": {ip: {} for ip in worker_vm_ips}
         }
     }
+
+    # If host_vm_ip exists, add it to _meta and also create a 'host' group.
+    if host_vm_ip:
+        inventory["_meta"]["hostvars"][host_vm_ip] = {
+            "ansible_host": host_vm_ip,
+            **common_vars
+        }
+        inventory["host"] = {
+            "hosts": {
+                host_vm_ip: {}
+            }
+        }
 
     return inventory
 
