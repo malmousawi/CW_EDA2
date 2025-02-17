@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import sys
 
 def run(command):
     """Run a shell command and return its output."""
@@ -15,12 +16,21 @@ def generate_inventory():
     try:
         # Fetch full Terraform output as JSON
         terraform_output = json.loads(run(["terraform", "output", "--json"]))
-        # Extract worker VM IPs from "value" field
+        # Extract worker VM IPs from "value" field (expected as a list)
         worker_vm_ips = terraform_output.get("worker_vm_ips", {}).get("value", [])
         # Extract host VM IP from "host_vm_ip" (if available)
-        host_vm_ip = terraform_output.get("host_vm_ip", {}).get("value", None)
+        host_vm_ip = terraform_output.get("host_vm_ip", {}).get("value", [])
     except Exception as e:
-        print(f"Error generating inventory: {e}")
+        print(f"Error generating inventory: {e}", file=sys.stderr)
+        return {}
+
+    # Debug output: show what IPs were found
+    print("DEBUG: Worker VM IPs found:", worker_vm_ips, file=sys.stderr)
+    print("DEBUG: Host VM IP found:", host_vm_ip, file=sys.stderr)
+
+    # If both are empty, warn the user
+    if not worker_vm_ips and not host_vm_ip:
+        print("WARNING: No VM IPs found in Terraform output.", file=sys.stderr)
         return {}
 
     ansible_user = "almalinux"
@@ -30,7 +40,7 @@ def generate_inventory():
         "ansible_ssh_common_args": "-o ForwardAgent=yes"
     }
 
-    # Build _meta hostvars for workers
+    # Build _meta hostvars for worker VMs
     worker_hostvars = {
         ip: {
             "ansible_host": ip,
@@ -39,27 +49,26 @@ def generate_inventory():
         for ip in worker_vm_ips
     }
 
-    # Build inventory groups
+    # Start building the inventory with both 'worker' and 'host' groups.
     inventory = {
         "_meta": {
-            "hostvars": worker_hostvars
+            "hostvars": worker_hostvars.copy()  # start with worker hostvars
         },
         "worker": {
             "hosts": {ip: {} for ip in worker_vm_ips}
+        },
+        "host": {
+            "hosts": {}  # will add the host VM here if available
         }
     }
 
-    # If host_vm_ip exists, add it to _meta and also create a 'host' group.
+    # If a host VM IP is available, add it to the _meta hostvars and the 'host' group.
     if host_vm_ip:
         inventory["_meta"]["hostvars"][host_vm_ip] = {
             "ansible_host": host_vm_ip,
             **common_vars
         }
-        inventory["host"] = {
-            "hosts": {
-                host_vm_ip: {}
-            }
-        }
+        inventory["host"]["hosts"][host_vm_ip] = {}
 
     return inventory
 
@@ -77,7 +86,7 @@ if __name__ == "__main__":
             inventory = generate_inventory()
             print(json.dumps(inventory, indent=4))
         except Exception as e:
-            print(f"Error generating inventory: {e}")
+            print(f"Error generating inventory: {e}", file=sys.stderr)
             print("{}")
     elif args.host:
         print(json.dumps({}))

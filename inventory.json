@@ -1,34 +1,37 @@
 {
     "_meta": {
         "hostvars": {
+            "10.134.12.216": {
+                "ansible_host": "10.134.12.216",
+                "ansible_user": "almalinux",
+                "ansible_ssh_common_args": "-o ForwardAgent=yes"
+            },
+            "10.134.12.217": {
+                "ansible_host": "10.134.12.217",
+                "ansible_user": "almalinux",
+                "ansible_ssh_common_args": "-o ForwardAgent=yes"
+            },
+            "10.134.12.115": {
+                "ansible_host": "10.134.12.115",
+                "ansible_user": "almalinux",
+                "ansible_ssh_common_args": "-o ForwardAgent=yes"
+            },
             "10.134.12.185": {
                 "ansible_host": "10.134.12.185",
                 "ansible_user": "almalinux",
-                "ansible_ssh_private_key_file": "/home/almalinux/CW_EDA2/ssh_key_1.pem"
-            },
-            "10.134.12.25": {
-                "ansible_host": "10.134.12.25",
-                "ansible_user": "almalinux",
-                "ansible_ssh_private_key_file": "/home/almalinux/CW_EDA2/ssh_key_1.pem"
-            },
-            "10.134.12.196": {
-                "ansible_host": "10.134.12.196",
-                "ansible_user": "almalinux",
-                "ansible_ssh_private_key_file": "/home/almalinux/CW_EDA2/ssh_key_1.pem"
-            },
-            "10.134.12.46": {
-                "ansible_host": "10.134.12.46",
-                "ansible_user": "almalinux",
-                "ansible_ssh_private_key_file": "/home/almalinux/CW_EDA2/ssh_key_1.pem"
+                "ansible_ssh_common_args": "-o ForwardAgent=yes"
             }
         }
     },
     "worker": {
         "hosts": {
-            "10.134.12.185": {},
-            "10.134.12.25": {},
-            "10.134.12.196": {},
-            "10.134.12.46": {}
+            "10.134.12.216": {},
+            "10.134.12.217": {},
+            "10.134.12.115": {},
+            "10.134.12.185": {}
         }
+    },
+    "host": {
+        "hosts": {}
     }
 }
