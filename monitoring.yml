@@ -1,0 +1,222 @@
+---
+- name: Monitoring Setup on All Nodes
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install firewalld and HTTPD on all nodes
+      yum:
+        name:
+          - firewalld
+          - httpd
+        state: present
+
+    - name: Enable and start firewalld on all nodes
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Enable and start HTTPD on all nodes
+      systemd:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Open required ports dynamically
+      block:
+        - name: Check if firewall-cmd exists
+          stat:
+            path: /usr/bin/firewall-cmd
+          register: firewall_cmd_exists
+
+        - name: Open ports using firewall-cmd
+          block:
+            - name: Open port 80 (HTTP)
+              command: firewall-cmd --add-port=80/tcp --permanent
+              when: firewall_cmd_exists.stat.exists
+
+            - name: Open port 9100 (Node Exporter)
+              command: firewall-cmd --add-port=9100/tcp --permanent
+              when: firewall_cmd_exists.stat.exists
+
+            - name: Open port 9090 (Prometheus)
+              command: firewall-cmd --add-port=9090/tcp --permanent
+              when: firewall_cmd_exists.stat.exists
+
+            - name: Open port 3000 (Grafana)
+              command: firewall-cmd --add-port=3000/tcp --permanent
+              when: firewall_cmd_exists.stat.exists
+
+            - name: Reload firewalld
+              command: firewall-cmd --reload
+              when: firewall_cmd_exists.stat.exists
+
+- name: Prometheus and Grafana Setup on Host
+  hosts: host
+  become: yes
+  tasks:
+    - name: Create Prometheus user
+      user:
+        name: prometheus
+        system: yes
+        shell: /sbin/nologin
+
+    - name: Ensure Prometheus directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+      loop:
+        - /opt/prometheus
+        - /opt/prometheus/data
+
+    - name: Download Prometheus
+      get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v2.48.0/prometheus-2.48.0.linux-amd64.tar.gz"
+        dest: /tmp/prometheus.tar.gz
+
+    - name: Extract Prometheus
+      unarchive:
+        src: /tmp/prometheus.tar.gz
+        dest: /opt/prometheus
+        remote_src: yes
+
+    - name: Configure Prometheus
+      copy:
+        dest: /opt/prometheus/prometheus.yml
+        content: |
+          global:
+            scrape_interval: 15s
+          scrape_configs:
+            - job_name: 'prometheus'
+              static_configs:
+                - targets: ['localhost:9090']
+            - job_name: 'node_exporter'
+              static_configs:
+                - targets:
+                  {% for host in groups['worker'] %}
+                    - '{{ hostvars[host].ansible_ssh_host }}:9100'
+                  {% endfor %}
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+
+    - name: Create Prometheus systemd service
+      copy:
+        dest: /etc/systemd/system/prometheus.service
+        content: |
+          [Unit]
+          Description=Prometheus Monitoring
+          After=network.target
+          [Service]
+          User=prometheus
+          Group=prometheus
+          ExecStart=/opt/prometheus/prometheus-2.48.0.linux-amd64/prometheus \
+            --config.file=/opt/prometheus/prometheus.yml \
+            --storage.tsdb.path=/opt/prometheus/data \
+            --web.listen-address=0.0.0.0:9090 \
+            --storage.tsdb.retention.time=15d \
+            --storage.tsdb.retention.size=2GB \
+            --log.level=info
+          Restart=always
+          MemoryMax=1G
+          LimitNOFILE=8192
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Reload systemd and start Prometheus
+      block:
+        - name: Reload systemd daemon
+          systemd:
+            daemon_reload: yes
+
+        - name: Enable and start Prometheus
+          systemd:
+            name: prometheus
+            state: started
+            enabled: yes
+
+    - name: Add Grafana repository with GPG key verification
+      yum_repository:
+        name: grafana
+        description: Grafana Repository
+        baseurl: "https://packages.grafana.com/oss/rpm"
+        gpgcheck: yes
+        repo_gpgcheck: yes
+        gpgkey: "https://packages.grafana.com/gpg.key"
+        enabled: yes
+
+    - name: Clear yum cache
+      command: yum clean all
+
+    - name: Update CA certificates
+      yum:
+        name: ca-certificates
+        state: latest
+
+    - name: Install Grafana
+      yum:
+        name: grafana
+        state: present
+
+    - name: Reload systemd and start Grafana
+      block:
+        - name: Reload systemd daemon
+          systemd:
+            daemon_reload: yes
+
+        - name: Enable and start Grafana
+          systemd:
+            name: grafana-server
+            state: started
+            enabled: yes
+
+- name: Install Node Exporter on Workers
+  hosts: worker
+  become: yes
+  tasks:
+    - name: Ensure Node Exporter directory exists
+      file:
+        path: /opt/node_exporter
+        state: directory
+        mode: '0755'
+
+    - name: Download Node Exporter
+      get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz"
+        dest: /tmp/node_exporter.tar.gz
+
+    - name: Extract Node Exporter
+      unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /opt/node_exporter
+        remote_src: yes
+
+    - name: Create Node Exporter systemd service
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+          [Service]
+          User=root
+          ExecStart=/opt/node_exporter/node_exporter-1.6.1.linux-amd64/node_exporter
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Reload systemd and start Node Exporter
+      block:
+        - name: Reload systemd daemon
+          systemd:
+            daemon_reload: yes
+
+        - name: Enable and start Node Exporter
+          systemd:
+            name: node_exporter
+            state: started
+            enabled: yes
