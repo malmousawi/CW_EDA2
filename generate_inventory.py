@@ -18,8 +18,8 @@ def generate_inventory():
         terraform_output = json.loads(run(["terraform", "output", "--json"]))
         # Extract worker VM IPs from "value" field (expected as a list)
         worker_vm_ips = terraform_output.get("worker_vm_ips", {}).get("value", [])
-        # Extract host VM IP from "host_vm_ip" (if available)
-        host_vm_ip = terraform_output.get("host_vm_ip", {}).get("value", [])
+        # Extract host VM IP(s) from "host_vm_ips" (if available)
+        host_vm_ip = terraform_output.get("host_vm_ips", {}).get("value", [])
     except Exception as e:
         print(f"Error generating inventory: {e}", file=sys.stderr)
         return {}
@@ -62,13 +62,16 @@ def generate_inventory():
         }
     }
 
-    # If a host VM IP is available, add it to the _meta hostvars and the 'host' group.
+    # If a host VM IP is available, extract the first IP from the list
     if host_vm_ip:
-        inventory["_meta"]["hostvars"][host_vm_ip] = {
-            "ansible_host": host_vm_ip,
-            **common_vars
-        }
-        inventory["host"]["hosts"][host_vm_ip] = {}
+        if isinstance(host_vm_ip, list):
+            host_vm_ip = host_vm_ip[0] if host_vm_ip else None
+        if host_vm_ip:
+            inventory["_meta"]["hostvars"][host_vm_ip] = {
+                "ansible_host": host_vm_ip,
+                **common_vars
+            }
+            inventory["host"]["hosts"][host_vm_ip] = {}
 
     return inventory
 

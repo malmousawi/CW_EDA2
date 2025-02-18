@@ -1,23 +1,28 @@
 {
     "_meta": {
         "hostvars": {
-            "10.134.12.216": {
-                "ansible_host": "10.134.12.216",
+            "10.134.12.218": {
+                "ansible_host": "10.134.12.218",
                 "ansible_user": "almalinux",
                 "ansible_ssh_common_args": "-o ForwardAgent=yes"
             },
-            "10.134.12.217": {
-                "ansible_host": "10.134.12.217",
+            "10.134.12.254": {
+                "ansible_host": "10.134.12.254",
                 "ansible_user": "almalinux",
                 "ansible_ssh_common_args": "-o ForwardAgent=yes"
             },
-            "10.134.12.115": {
-                "ansible_host": "10.134.12.115",
+            "10.134.12.222": {
+                "ansible_host": "10.134.12.222",
                 "ansible_user": "almalinux",
                 "ansible_ssh_common_args": "-o ForwardAgent=yes"
             },
-            "10.134.12.185": {
-                "ansible_host": "10.134.12.185",
+            "10.134.13.0": {
+                "ansible_host": "10.134.13.0",
+                "ansible_user": "almalinux",
+                "ansible_ssh_common_args": "-o ForwardAgent=yes"
+            },
+            "10.134.12.246": {
+                "ansible_host": "10.134.12.246",
                 "ansible_user": "almalinux",
                 "ansible_ssh_common_args": "-o ForwardAgent=yes"
             }
@@ -25,13 +30,15 @@
     },
     "worker": {
         "hosts": {
-            "10.134.12.216": {},
-            "10.134.12.217": {},
-            "10.134.12.115": {},
-            "10.134.12.185": {}
+            "10.134.12.218": {},
+            "10.134.12.254": {},
+            "10.134.12.222": {},
+            "10.134.13.0": {}
         }
     },
     "host": {
-        "hosts": {}
+        "hosts": {
+            "10.134.12.246": {}
+        }
     }
 }
