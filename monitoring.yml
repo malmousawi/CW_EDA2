@@ -97,7 +97,7 @@
               static_configs:
                 - targets:
                   {% for host in groups['worker'] %}
-                    - '{{ hostvars[host].ansible_ssh_host }}:9100'
+                    - '{{ hostvars[host].get("ansible_host", host) }}:9100'
                   {% endfor %}
         owner: prometheus
         group: prometheus
