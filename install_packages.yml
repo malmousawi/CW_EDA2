@@ -1,0 +1,22 @@
+- name: Install packages on all VMs
+  hosts: all
+  become: yes
+  tasks:
+    - name: Update package repository
+      yum:
+        name: "*"
+        state: latest
+
+    - name: Install required packages
+      yum:
+        name:
+          - wget
+          - tar
+          - openssh-server
+        state: present
+
+    - name: Start and enable SSH service
+      service:
+        name: sshd
+        state: started
+        enabled: yes
