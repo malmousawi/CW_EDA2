@@ -1,0 +1,4 @@
+---
+
+- import_playbook: full-local.yaml
+- import_playbook: reboot.yaml
