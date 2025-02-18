@@ -1,6 +1,6 @@
 ---
 - name: Open ports 9000 and 9001 permanently
-  hosts: storage
+  hosts: host
   become: true
 
   tasks:
