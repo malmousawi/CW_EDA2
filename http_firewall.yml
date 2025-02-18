@@ -1,0 +1,44 @@
+---
+- name: Configure HTTP and Firewall Settings
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install required packages
+      yum:
+        name:
+          - httpd
+          - firewalld
+        state: present
+
+    - name: Enable and start firewalld
+      block:
+        - name: Ensure firewalld is installed
+          yum:
+            name: firewalld
+            state: present
+
+        - name: Start and enable firewalld
+          systemd:
+            name: firewalld
+            state: started
+            enabled: yes
+
+      rescue:
+        - name: Report firewalld installation or startup failure
+          debug:
+            msg: "Failed to install or start firewalld on {{ inventory_hostname }}"
+
+    - name: Add HTTP service to firewall
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+
+    - name: Reload firewall
+      command: firewall-cmd --reload
+
+    - name: Start and enable httpd
+      systemd:
+        name: httpd
+        state: started
+        enabled: yes
