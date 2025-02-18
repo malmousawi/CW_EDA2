@@ -1,0 +1,31 @@
+---
+- name: Open ports 9000 and 9001 permanently
+  hosts: storage
+  become: true
+
+  tasks:
+    - name: Ensure firewalld is installed
+      yum:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld is running and enabled
+      systemd:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Open port 9000 permanently
+      firewalld:
+        port: 9000/tcp
+        permanent: true
+        state: enabled
+
+    - name: Open port 9001 permanently
+      firewalld:
+        port: 9001/tcp
+        permanent: true
+        state: enabled
+
+    - name: Reload firewalld to apply changes
+      command: firewall-cmd --reload
