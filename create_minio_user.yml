@@ -1,0 +1,81 @@
+---
+- name: Create a MinIO user with read-only access
+  hosts: host
+  become: true
+  vars:
+    minio_user: researcher1  # Username for the new user
+    minio_password: researcher1password  # Password for the new user
+    bucket_name: research-results  # The bucket to which access is granted
+    admin_password_file: /home/almalinux/miniopass  # File containing the admin password
+
+  tasks:
+    - name: Read MinIO admin password
+      ansible.builtin.slurp:
+        src: "{{ admin_password_file }}"
+      register: admin_password_encoded
+
+    - name: Decode the MinIO admin password
+      ansible.builtin.set_fact:
+        admin_password: "{{ (admin_password_encoded.content | b64decode).strip() }}"
+
+    - name: Configure MinIO client alias
+      ansible.builtin.shell: >
+        mc alias set myminio https://{{ ansible_default_ipv4.address }}:9000
+        myminioadmin "{{ admin_password }}" --insecure
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+
+    - name: Create MinIO user
+      ansible.builtin.shell: >
+        mc admin user add myminio {{ minio_user }} {{ minio_password }} --insecure
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+
+    - name: Create read-only policy
+      copy:
+        content: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Action": [
+                  "s3:GetBucketLocation",
+                  "s3:ListBucket"
+                ],
+                "Effect": "Allow",
+                "Resource": [
+                  "arn:aws:s3:::{{ bucket_name }}"
+                ]
+              },
+              {
+                "Action": [
+                  "s3:GetObject"
+                ],
+                "Effect": "Allow",
+                "Resource": [
+                  "arn:aws:s3:::{{ bucket_name }}/*"
+                ]
+              }
+            ]
+          }
+        dest: /tmp/read-only-policy.json
+
+    - name: Add read-only policy to MinIO
+      ansible.builtin.shell: >
+        mc admin policy create myminio read-only-policy /tmp/read-only-policy.json --insecure
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+
+    - name: Attach read-only policy to the user
+      ansible.builtin.shell: >
+        mc admin policy attach myminio read-only-policy --user researcher1 --insecure
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
