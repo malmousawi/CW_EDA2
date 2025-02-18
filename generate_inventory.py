@@ -37,7 +37,7 @@ def generate_inventory():
     # Using SSH agent forwarding, so we don't specify a private key file.
     common_vars = {
         "ansible_user": ansible_user,
-        "ansible_ssh_common_args": "-o ForwardAgent=yes"
+        "ansible_ssh_common_args": "-o ForwardAgent=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     }
 
     # Build _meta hostvars for worker VMs
